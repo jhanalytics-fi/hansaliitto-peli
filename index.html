@@ -138,10 +138,10 @@ const GSHORT={'Grain':'Vilja','Timber':'Puu','Fish':'Kala','Beer':'Olut','Hides'
 let pricesOn=false;
 function togglePrices(){pricesOn=!pricesOn;document.getElementById('prices').style.display=pricesOn?'block':'none';renderPrices();}
 function renderPrices(){if(!pricesOn||!G)return;const here=N[P().pos].name;
- let h='<table><tr><th>Kaupunki (vihreä = SELLS varastossa, harmaa = tyhjä, <span class="b">keltainen</span> = BUYS)</th>'+GOODS.map(g=>`<th>${GSHORT[g]}</th>`).join('')+'</tr>';
+ let h='<table><tr><th>Kaupunki (vihreä = SELLS varastossa, harmaa = tyhjä, <span class="b">keltainen</span> = BUYS, rajaton, paras hinta)</th>'+GOODS.map(g=>`<th>${GSHORT[g]}</th>`).join('')+'</tr>';
  for(const c of Object.keys(DATA.markets).sort()){const m=DATA.markets[c];
   h+=`<tr class="${c===here?'here':''}"><td>${c}</td>`+GOODS.map(g=>{const sells=m.SELLS.map((s,i)=>[s,i]).filter(([s])=>s[0]===g).map(([s,i])=>`<span class="${G.stock[c].SELLS[i]?'s':'e'}">${s[1]}</span>`);
-   const buys=m.BUYS.filter(s=>s[0]===g).map(s=>`<span class="b">${s[1]}</span>`);return `<td>${sells.join(' ')}${sells.length&&buys.length?' | ':''}${buys.join(' ')}</td>`}).join('')+'</tr>';}
+   const bp=m.BUYS.filter(s=>s[0]===g).map(s=>s[1]);const buys=bp.length?[`<span class="b">${Math.max(...bp)}</span>`]:[];return `<td>${sells.join(' ')}${sells.length&&buys.length?' | ':''}${buys.join(' ')}</td>`}).join('')+'</tr>';}
  document.getElementById('prices').innerHTML=h+'</table>';}
 // --- UI
 function render(){const p=P();drawTokens();renderPrices();
