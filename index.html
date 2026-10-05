@@ -37,7 +37,7 @@ small{color:#999}
  Lasti max <input id="cap" type="number" value="6"></p>
 <p>SELLS-lokeroista täynnä alussa <input id="fill" type="number" value="40"> %
  &nbsp; Täydennys / kierros <input id="refill" type="number" value="8"> lokeroa <small>(korttien sijaisena)</small></p>
-<p><small>Säännöt: maalla 1 noppa, merellä 2 noppaa. Laivaan/laivasta vain satamissa. Kauppa missä tahansa kaupungissa oman vuoron aikana;
+<p><small>Säännöt: maalla D8, merellä 2D6. Laivaan/laivasta vain satamissa. Kauppa missä tahansa kaupungissa oman vuoron aikana;
 BUYS ostaa rajattomasti parhaalla lokerohinnalla. Vain Turun pankkiin talletettu raha pisteytetään. Velka: korko 100 %.</small></p>
 <button onclick="newGame()">Aloita</button> <button onclick="loadGame()" id="loadbtn">Jatka tallennettua</button>
 </div></div></div>
@@ -110,7 +110,7 @@ function reachMap(){const p=P();const dist={[p.pos]:0},prev={};const q=[p.pos];
 function reachable(){return Object.keys(reachMap().dist).map(Number);}
 function P(){return G.players[G.cur]}
 // --- vuoro
-function startMove(mode){const p=P();if(G.moved)return;if(mode!==p.veh&&!MIXED.has(p.pos))return;p.veh=mode;G.mode=mode;const d1=rnd(6),d2=mode==='meri'?rnd(6):0;G.mp=d1+d2;G.phase='move';G.moved=true;
+function startMove(mode){const p=P();if(G.moved)return;if(mode!==p.veh&&!MIXED.has(p.pos))return;p.veh=mode;G.mode=mode;const d1=mode==='meri'?rnd(6):rnd(8),d2=mode==='meri'?rnd(6):0;G.mp=d1+d2;G.phase='move';G.moved=true;
  log(`${mode==='meri'?'purjehtii':'kulkee maitse'}, noppa ${d1}${d2?'+'+d2:''} = ${G.mp}`);render();}
 function clickNode(id){if(G.phase!=='move'||G.mp<=0)return;const {dist,prev}=reachMap();if(!(id in dist))return;const p=P();
  const path=[];for(let n=id;n!==p.pos;n=prev[n])path.unshift(n);
@@ -159,7 +159,7 @@ function render(){const p=P();drawTokens();renderPrices();
  const canSea=(p.veh==='meri'||MIXED.has(p.pos))&&(ADJ[p.pos]||[]).some(e=>e[1]==='meri'),canLand=(p.veh==='maa'||MIXED.has(p.pos))&&(ADJ[p.pos]||[]).some(e=>e[1]==='maa');
  let a='';
  if(G.phase==='end')a='<b>Peli päättynyt</b>';
- else if(!G.moved)a=`<button onclick="startMove('maa')" ${canLand?'':'disabled'}>Vankkurit (1 noppa)</button> <button onclick="startMove('meri')" ${canSea?'':'disabled'}>Laiva (2 noppaa)</button> <small>nyt: ${p.veh==='meri'?'laivassa':'maalla'}${MIXED.has(p.pos)?', rantapaikka (vaihto sallittu)':''}</small> <button onclick="stopHere()">Jää paikalleen</button>`;
+ else if(!G.moved)a=`<button onclick="startMove('maa')" ${canLand?'':'disabled'}>Vankkurit (D8)</button> <button onclick="startMove('meri')" ${canSea?'':'disabled'}>Laiva (2D6)</button> <small>nyt: ${p.veh==='meri'?'laivassa':'maalla'}${MIXED.has(p.pos)?', rantapaikka (vaihto sallittu)':''}</small> <button onclick="stopHere()">Jää paikalleen</button>`;
  else if(G.phase==='move')a=`Liikepisteitä jäljellä <b>${G.mp}</b> (${G.mode}). Klikkaa mitä tahansa valkoreunaista palluraa, siirto kulkee lyhintä reittiä. <button onclick="stopHere()">Pysähdy tähän</button>`;
  if(G.phase!=='end')a+=` <button onclick="endTurn()">Lopeta vuoro</button> <button onclick="loan()">Velkaa</button> <button onclick="repay()" ${p.debt&&p.money?'':'disabled'}>Maksa velkaa</button>`;
  document.getElementById('actions').innerHTML=a;
