@@ -21,6 +21,7 @@ table{border-collapse:collapse;width:100%}td,th{padding:2px 4px;text-align:left;
 .slot{display:inline-block;min-width:92px;margin:1px;padding:2px 4px;border:1px solid #555;border-radius:3px;font-size:12px;background:#2a2a2a}
 .slot.empty{opacity:.45}.slot.used{text-decoration:line-through;opacity:.5}
 .node{cursor:pointer}.node.reach{stroke:#fff;stroke-width:3}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}.tok.active{animation:blink 1s infinite}
 .hl{fill:none;stroke:#ff0;stroke-width:4;opacity:.8}
 #setup{position:absolute;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:9}
 #setup div{background:#1a1a1a;padding:20px;border:1px solid #666;max-width:520px}
@@ -98,18 +99,25 @@ function draw(){
 function drawTokens(){
  const g=document.getElementById('tokens');let h='';const byPos={};
  G.players.forEach(p=>{(byPos[p.pos]=byPos[p.pos]||[]).push(p)});
- for(const [pos,ps] of Object.entries(byPos))ps.forEach((p,k)=>{h+=`<circle cx="${sx(N[pos].x)+k*14-7*(ps.length-1)}" cy="${sy(N[pos].y)}" r="9" fill="${COL[p.i]}" stroke="#000" stroke-width="2" pointer-events="none"/><text x="${sx(N[pos].x)+k*14-7*(ps.length-1)}" y="${sy(N[pos].y)+4}" font-size="11" text-anchor="middle" pointer-events="none">${p.i+1}</text>`});
+ for(const [pos,ps] of Object.entries(byPos))ps.forEach((p,k)=>{h+=`<circle class="tok ${p.i===G.cur?'active':''}" cx="${sx(N[pos].x)+k*14-7*(ps.length-1)}" cy="${sy(N[pos].y)}" r="9" fill="${COL[p.i]}" stroke="#000" stroke-width="2" pointer-events="none"/><text x="${sx(N[pos].x)+k*14-7*(ps.length-1)}" y="${sy(N[pos].y)+4}" font-size="11" text-anchor="middle" pointer-events="none">${p.i+1}</text>`});
  g.innerHTML=h;
  document.querySelectorAll('.node').forEach(e=>e.classList.remove('reach'));
  if(G.phase==='move')reachable().forEach(id=>document.getElementById('n'+id).classList.add('reach'));
 }
-function reachable(){const p=P();return (ADJ[p.pos]||[]).filter(([b,t])=>t===G.mode).map(([b])=>b);}
+function reachMap(){const p=P();const dist={[p.pos]:0},prev={};const q=[p.pos];
+ while(q.length){const u=q.shift();if(dist[u]>=G.mp)continue;for(const [v,t] of (ADJ[u]||[])){if(t!==G.mode||v in dist)continue;dist[v]=dist[u]+1;prev[v]=u;q.push(v);}}
+ delete dist[p.pos];return {dist,prev};}
+function reachable(){return Object.keys(reachMap().dist).map(Number);}
 function P(){return G.players[G.cur]}
 // --- vuoro
 function startMove(mode){const p=P();if(G.moved)return;if(mode!==p.veh&&!MIXED.has(p.pos))return;p.veh=mode;G.mode=mode;const d1=rnd(6),d2=mode==='meri'?rnd(6):0;G.mp=d1+d2;G.phase='move';G.moved=true;
  log(`${mode==='meri'?'purjehtii':'kulkee maitse'}, noppa ${d1}${d2?'+'+d2:''} = ${G.mp}`);render();}
-function clickNode(id){if(G.phase!=='move'||G.mp<=0)return;if(!reachable().includes(id))return;const p=P();p.pos=id;G.mp--;G.usedBuys={};
- if(N[id].kind==='kaupunki'){log(`saapuu: ${N[id].name}${N[id].name==='Åbo'?' (koti)':''}`);}
+function clickNode(id){if(G.phase!=='move'||G.mp<=0)return;const {dist,prev}=reachMap();if(!(id in dist))return;const p=P();
+ const path=[];for(let n=id;n!==p.pos;n=prev[n])path.unshift(n);
+ const via=path.slice(0,-1).filter(n=>N[n].kind==='kaupunki').map(n=>N[n].name);
+ p.pos=id;G.mp-=dist[id];G.usedBuys={};
+ if(via.length)log(`kulkee ohi: ${via.join(', ')}`);
+ if(N[id].kind==='kaupunki'){log(`saapuu: ${N[id].name}${N[id].name==='Åbo'?' (koti)':''} (${dist[id]} askelta)`);}else log(`siirtyy ${dist[id]} askelta`);
  if(G.mp===0){G.phase='done';log('liikepisteet käytetty');}
  render();}
 function stopHere(){G.phase='done';G.mp=0;log('pysähtyy '+(N[P().pos].name||'pallurassa '+P().pos));render();}
@@ -152,7 +160,7 @@ function render(){const p=P();drawTokens();renderPrices();
  let a='';
  if(G.phase==='end')a='<b>Peli päättynyt</b>';
  else if(!G.moved)a=`<button onclick="startMove('maa')" ${canLand?'':'disabled'}>Vankkurit (1 noppa)</button> <button onclick="startMove('meri')" ${canSea?'':'disabled'}>Laiva (2 noppaa)</button> <small>nyt: ${p.veh==='meri'?'laivassa':'maalla'}${MIXED.has(p.pos)?', rantapaikka (vaihto sallittu)':''}</small> <button onclick="stopHere()">Jää paikalleen</button>`;
- else if(G.phase==='move')a=`Liikepisteitä jäljellä <b>${G.mp}</b> (${G.mode}). Klikkaa valkoreunaista palluraa. <button onclick="stopHere()">Pysähdy tähän</button>`;
+ else if(G.phase==='move')a=`Liikepisteitä jäljellä <b>${G.mp}</b> (${G.mode}). Klikkaa mitä tahansa valkoreunaista palluraa, siirto kulkee lyhintä reittiä. <button onclick="stopHere()">Pysähdy tähän</button>`;
  if(G.phase!=='end')a+=` <button onclick="endTurn()">Lopeta vuoro</button> <button onclick="loan()">Velkaa</button> <button onclick="repay()" ${p.debt&&p.money?'':'disabled'}>Maksa velkaa</button>`;
  document.getElementById('actions').innerHTML=a;
  const c=N[p.pos].name;let h='';
