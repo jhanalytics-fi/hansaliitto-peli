@@ -37,7 +37,7 @@ small{color:#999}
 <p>SELLS-lokeroista täynnä alussa <input id="fill" type="number" value="40"> %
  &nbsp; Täydennys / kierros <input id="refill" type="number" value="8"> lokeroa <small>(korttien sijaisena)</small></p>
 <p><small>Säännöt: maalla 1 noppa, merellä 2 noppaa. Laivaan/laivasta vain satamissa. Kauppa missä tahansa kaupungissa oman vuoron aikana;
-jokainen BUYS-lokero ostaa yhden yksikön per käynti. Vain Turun pankkiin talletettu raha pisteytetään. Velka: korko 100 %.</small></p>
+BUYS ostaa rajattomasti parhaalla lokerohinnalla. Vain Turun pankkiin talletettu raha pisteytetään. Velka: korko 100 %.</small></p>
 <button onclick="newGame()">Aloita</button> <button onclick="loadGame()" id="loadbtn">Jatka tallennettua</button>
 </div></div></div>
 <div id="side">
@@ -122,8 +122,8 @@ function refill(){let empty=[];for(const [c,s] of Object.entries(G.stock))s.SELL
 // --- kauppa
 function buy(c,i){const p=P();const [g,pr]=DATA.markets[c].SELLS[i];if(!G.stock[c].SELLS[i]||p.money<pr||p.cargo.length>=G.cap)return;
  p.money-=pr;p.cargo.push(g);G.stock[c].SELLS[i]=false;p.trades++;log(`ostaa ${g} ${pr} t (${c})`);render();}
-function sell(c,i){const p=P();const [g,pr]=DATA.markets[c].BUYS[i];const k=c+'|'+i;if(G.usedBuys[k])return;const ci=p.cargo.indexOf(g);if(ci<0)return;
- p.cargo.splice(ci,1);p.money+=pr;G.usedBuys[k]=true;p.trades++;log(`myy ${g} ${pr} t (${c})`);render();}
+function sell(c,i){const p=P();const [g,pr]=DATA.markets[c].BUYS[i];const ci=p.cargo.indexOf(g);if(ci<0)return;
+ p.cargo.splice(ci,1);p.money+=pr;p.trades++;log(`myy ${g} ${pr} t (${c})`);render();}
 function deposit(){const p=P();const a=+prompt('Talleta taalereita Turun pankkiin',p.money);if(!(a>0)||a>p.money)return;p.money-=a;p.bank+=a;log(`tallettaa ${a} t (pankki ${p.bank})`);render();}
 function withdraw(){const p=P();const a=+prompt('Nosta pankista',p.bank);if(!(a>0)||a>p.bank)return;p.bank-=a;p.money+=a;log(`nostaa ${a} t`);render();}
 function storeGood(g){const p=P();const i=p.cargo.indexOf(g);if(i<0)return;p.cargo.splice(i,1);p.bankGoods.push(g);log(`varastoi ${g} Turkuun`);render();}
@@ -158,7 +158,7 @@ function render(){const p=P();drawTokens();renderPrices();
  const c=N[p.pos].name;let h='';
  if(c&&DATA.markets[c]&&G.phase!=='end'){const m=DATA.markets[c];
   h+=`<b>${c}</b> &nbsp; <small>SELLS = osta kaupungilta, BUYS = myy kaupungille</small><br><div>SELLS: ${m.SELLS.map(([g,pr],i)=>`<span class="slot ${G.stock[c].SELLS[i]?'':'empty'}">${g} ${pr}t ${G.stock[c].SELLS[i]?`<button onclick="buy('${c}',${i})" ${p.money>=pr&&p.cargo.length<G.cap?'':'disabled'}>osta</button>`:'<small>tyhjä</small>'}</span>`).join('')}</div>
-  <div>BUYS: ${m.BUYS.map(([g,pr],i)=>`<span class="slot ${G.usedBuys[c+'|'+i]?'used':''}">${g} ${pr}t <button onclick="sell('${c}',${i})" ${p.cargo.includes(g)&&!G.usedBuys[c+'|'+i]?'':'disabled'}>myy</button></span>`).join('')}</div>`;
+  <div>BUYS (rajaton, paras hinta): ${m.BUYS.map(([g,pr],i)=>[g,pr,i]).filter(([g,pr,i])=>!m.BUYS.some(([g2,pr2],j)=>g2===g&&(pr2>pr||(pr2===pr&&j<i)))).map(([g,pr,i])=>`<span class="slot">${g} ${pr}t <button onclick="sell('${c}',${i})" ${p.cargo.includes(g)?'':'disabled'}>myy</button></span>`).join('')}</div>`;
   if(c==='Åbo')h+=`<div style="margin-top:6px"><b>Turun pankki ja varasto</b> <button onclick="deposit()">Talleta</button> <button onclick="withdraw()">Nosta</button><br>Varastossa: ${p.bankGoods.map(g=>`<span class="slot">${g} <button onclick="takeGood('${g}')">ota</button></span>`).join('')||'-'}<br>Lastista varastoon: ${[...new Set(p.cargo)].map(g=>`<button onclick="storeGood('${g}')">${g}</button>`).join('')}</div>`;}
  else if(c==='Vadstena')h='<b>Vadstena</b> - uskonnollinen keskus, ei markkinoita (v0.1)';
  document.getElementById('city').innerHTML=h;save();}
