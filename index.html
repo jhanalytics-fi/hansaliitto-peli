@@ -72,7 +72,7 @@ function newGame(){
  const target=Math.round(slots.length*fill);let filled=0;
  slots=slots.map(s=>[...s,Math.random()/s[2]]).sort((a,b)=>a[3]-b[3]);
  for(const s of slots){if(filled>=target)break;stock[s[0]].SELLS[s[1]]=true;filled++;}
- G={round:1,rounds:+document.getElementById('nr').value,cap:+document.getElementById('cap').value,refill:+document.getElementById('refill').value,deck:[],rack:[],discard:[],temp:{},lastCard:null,
+ G={round:1,rounds:+document.getElementById('nr').value,cap:+document.getElementById('cap').value,refill:+document.getElementById('refill').value,deck:[],rack:[],discard:[],temp:{},lastCard:null,sickRolled:false,healed:false,
   cur:0,stock,log:[],phase:'start',mp:0,mode:null,moved:false,usedBuys:{},
   players:Array.from({length:np},(_,i)=>({i,name:'Pelaaja '+(i+1),pos:CITY['Åbo'],veh:'maa',piety:0,strength:0,health:3,hand:[],disc:null,invested:{},cap:+document.getElementById('cap').value,ship:'',once:{},money:+document.getElementById('money').value,cargo:[],bank:0,bankGoods:[],debt:0,trades:0}))};
  document.getElementById('setup').style.display='none';
@@ -127,16 +127,16 @@ function clickNode(id){if(G.phase!=='move'||G.mp<=0)return;const {dist,prev}=rea
  if(G.mp===0){G.phase='done';log('liikepisteet käytetty');}
  render();}
 function stopHere(){G.phase='done';G.mp=0;log('pysähtyy '+(N[P().pos].name||'pallurassa '+P().pos));render();}
-function endTurn(){const p=P();G.cur++;G.usedBuys={};G.moved=false;G.mode=null;G.phase='start';
+function endTurn(){const p=P();G.cur++;G.usedBuys={};G.moved=false;G.mode=null;G.phase='start';G.sickRolled=false;G.healed=false;
  if(G.cur>=G.players.length){G.cur=0;G.round++;refill();if(G.round>G.rounds){endGame();return;}log(`--- kierros ${G.round} ---`);drawCard();}
  render();}
 function refill(){let empty=[];for(const [c,s] of Object.entries(G.stock))s.SELLS.forEach((v,i)=>{if(!v&&!stockLocked(c,DATA.markets[c].SELLS[i][0]))empty.push([c,i])});
  let n=Math.min(G.refill,empty.length),names=[];for(let k=0;k<n;k++){const j=Math.floor(Math.random()*empty.length);const [c,i]=empty.splice(j,1)[0];G.stock[c].SELLS[i]=true;names.push(c+': '+DATA.markets[c].SELLS[i][0]);}
  if(n)log('täydennys: '+names.join(', '));}
 // --- kauppa
-function buy(c,i){const p=P();const [g,pr0]=DATA.markets[c].SELLS[i];let pr=effPrice(c,'SELLS',g,pr0);if(p.disc&&(p.disc.goods==='all'||p.disc.goods.includes(g))&&(p.disc.cities==='all'||cities(p.disc.cities,'all').includes(c))){pr=Math.max(1,pr+p.disc.delta);log(`alennus ${p.disc.delta} t käytetty`);p.disc=null;}if(isBanned(c,'SELLS',g)||!G.stock[c].SELLS[i]||p.money<pr||p.cargo.length>=p.cap)return;
+function buy(c,i){const p=P();if(p.sick)return;const [g,pr0]=DATA.markets[c].SELLS[i];let pr=effPrice(c,'SELLS',g,pr0);if(p.disc&&(p.disc.goods==='all'||p.disc.goods.includes(g))&&(p.disc.cities==='all'||cities(p.disc.cities,'all').includes(c))){pr=Math.max(1,pr+p.disc.delta);log(`alennus ${p.disc.delta} t käytetty`);p.disc=null;}if(isBanned(c,'SELLS',g)||!G.stock[c].SELLS[i]||p.money<pr||p.cargo.length>=p.cap)return;
  p.money-=pr;p.cargo.push(g);G.stock[c].SELLS[i]=false;p.trades++;log(`ostaa ${g} ${pr} t (${c})`);tradeHook(c);render();}
-function sell(c,i){const p=P();const [g,pr0]=DATA.markets[c].BUYS[i];const pr=effPrice(c,'BUYS',g,pr0);if(isBanned(c,'BUYS',g))return;const ci=p.cargo.indexOf(g);if(ci<0)return;
+function sell(c,i){const p=P();if(p.sick)return;const [g,pr0]=DATA.markets[c].BUYS[i];const pr=effPrice(c,'BUYS',g,pr0);if(isBanned(c,'BUYS',g))return;const ci=p.cargo.indexOf(g);if(ci<0)return;
  p.cargo.splice(ci,1);p.money+=pr;p.trades++;log(`myy ${g} ${pr} t (${c})`);tradeHook(c);render();}
 function deposit(){const p=P();const a=+prompt('Talleta taalereita Turun pankkiin',p.money);if(!(a>0)||a>p.money)return;p.money-=a;p.bank+=a;log(`tallettaa ${a} t (pankki ${p.bank})`);render();}
 function withdraw(){const p=P();const a=+prompt('Nosta pankista',p.bank);if(!(a>0)||a>p.bank)return;p.bank-=a;p.money+=a;log(`nostaa ${a} t`);render();}
@@ -167,6 +167,14 @@ function rollDie(n){return Math.ceil(Math.random()*n);}
 function priceOf(spec){if(typeof spec==='number')return spec;if(spec==='d6')return rollDie(6);if(spec==='2d6')return rollDie(6)+rollDie(6);if(spec==='8+d6')return 8+rollDie(6);return 1;}
 function cond(p,cd,c){if(!cd)return true;if('piety_max' in cd&&p.piety>cd.piety_max)return false;if('piety_min' in cd&&p.piety<cd.piety_min)return false;if(cd.has_cargo&&!p.cargo.length)return false;if(cd.in_region&&!CARDS.regions[cd.in_region].includes(N[p.pos].name))return false;if(cd.in_city&&N[p.pos].name!==cd.in_city)return false;if(cd.at_sea&&!(p.veh==='meri'&&N[p.pos].kind!=='kaupunki'))return false;if('money_min' in cd&&p.money<cd.money_min)return false;if(cd.invested&&!p.invested[cd._card])return false;return true;}
 function clamp(v){return Math.max(-3,Math.min(3,v));}
+function setHealth(p,v){p.health=Math.max(0,Math.min(5,v));if(p.health===0&&!p.sick){p.sick=true;log(`${p.name} on SAIRAS: on mentävä lähimpään kaupunkiin ja toivuttava (1d6: 5-6)`);}}
+function nearestCity(p){const dist={[p.pos]:0},prev={};const q=[p.pos];while(q.length){const u=q.shift();if(N[u].kind==='kaupunki'&&u!==p.pos){const path=[];for(let n=u;n!==p.pos;n=prev[n])path.unshift(n);return {city:u,path};}for(const [v,t] of (ADJ[u]||[])){if(v in dist)continue;if(t!==p.veh&&!MIXED.has(u))continue;dist[v]=dist[u]+1;prev[v]=u;q.push(v);}}return null;}
+function recoverRoll(){const p=P();if(!p.sick||G.sickRolled)return;const v=rollDie(6);G.sickRolled=true;if(v>=5){p.sick=false;setHealth(p,1);log(`${p.name} heittää ${v}: toipuu (terveys 1)`);}else{log(`${p.name} heittää ${v}: yhä sairas, vuoro menee lepoon`);G.phase='done';G.moved=true;}render();}
+function heal(){const p=P();const c=N[p.pos].name;if(!CARDS.regions.USKONNOLLISET.includes(c)||p.money<1||p.health>=5||G.healed)return;p.money-=1;G.healed=true;const was=p.sick;setHealth(p,p.health+1);if(was){p.sick=false;log(`${p.name} paranee ${c}:ssa 1 t: terveys ${p.health}, ei enää sairas`);}else log(`${p.name} hoito ${c}:ssa 1 t: terveys ${p.health}`);render();}
+function sickMove(){const p=P();const nc=nearestCity(p);if(!nc){G.phase='done';return;}const mode=path0Mode(p,nc.path);G.mode=mode;G.moved=true;const d1=mode==='meri'?rollDie(6):rollDie(8),d2=mode==='meri'?rollDie(6):0;let mp=d1+d2;let k=0;let cur=p.pos;
+ while(k<nc.path.length&&mp>0){const nxt=nc.path[k];const et=(ADJ[cur]||[]).find(([v])=>v===nxt)[1];if(et!==mode){if(MIXED.has(cur)){mode=et;G.mode=mode;}else break;}cur=nxt;k++;mp--;}
+ p.pos=cur;p.veh=G.mode;G.phase='done';log(`${p.name} (sairas) kulkee kohti lähintä kaupunkia (${N[nc.city].name}), noppa ${d1}${d2?'+'+d2:''}`);if(N[cur].kind==='kaupunki'){log(`saapuu: ${N[cur].name}`);arriveHook(N[cur].name);}render();}
+function path0Mode(p,path){const et=(ADJ[p.pos]||[]).find(([v])=>v===path[0]);return et?et[1]:p.veh;}
 function enterBanned(p,v){if(!N[v].name)return false;return effs('ban_enter').some(([e])=>cond(p,e.cond)&&cities(e.cities,'all').includes(N[v].name));}
 function applyStock(e){const gs=e.goods;for(const c of cities(e.cities,gs)){if(!DATA.markets[c])continue;const S=DATA.markets[c].SELLS,st=G.stock[c].SELLS;let n=e.n||1;
  for(let i=0;i<S.length;i++){const g=S[i][0];if(!matchG(e,g))continue;
@@ -177,7 +185,7 @@ function applyStock(e){const gs=e.goods;for(const c of cities(e.cities,gs)){if(!
 function applyTo(p,e,card){ // yhteen pelaajaan kohdistuva vaikutus
  if(e.t==='money'){p.money=Math.max(0,p.money+e.delta);log(`${card.id}: ${p.name} ${e.delta>0?'+':''}${e.delta} t`);}
  else if(e.t==='money_roll'){const v=Array.from({length:e.dice}).reduce(a=>a+rollDie(6),0);p.money+=v;log(`${card.id}: ${p.name} +${v} t (noppa)`);}
- else if(e.t==='stat'){const k=e.stat;p[k]=k==='health'?Math.max(0,Math.min(5,p[k]+e.delta)):clamp(p[k]+e.delta);log(`${card.id}: ${p.name} ${k==='piety'?'hurskaus':k==='health'?'terveys':'voima'} ${e.delta>0?'+':''}${e.delta}`);}
+ else if(e.t==='stat'){const k=e.stat;if(k==='health')setHealth(p,p.health+e.delta);else p[k]=clamp(p[k]+e.delta);log(`${card.id}: ${p.name} ${k==='piety'?'hurskaus':k==='health'?'terveys':'voima'} ${e.delta>0?'+':''}${e.delta}`);}
  else if(e.t==='give'){if(p.cargo.length<p.cap){p.cargo.push(e.good);log(`${card.id}: ${p.name} saa ${e.good}`);}}
  else if(e.t==='lose_cargo'){let n=e.n||1;if(!p.cargo.length&&e.or_money){p.money=Math.max(0,p.money+e.or_money);log(`${card.id}: ${p.name} ${e.or_money} t`);return;}
   for(let i=p.cargo.length-1;i>=0&&n>0;i--){if(e.cond&&e.cond.good&&p.cargo[i]!==e.cond.good)continue;log(`${card.id}: ${p.name} menettää ${p.cargo[i]}`);p.cargo.splice(i,1);n--;}}
@@ -204,7 +212,7 @@ function visitEffects(cityName){return effs('visit').filter(([e])=>cities(e.citi
 function arriveHook(cityName){const p=P();
  if(CARDS.regions.USKONNOLLISET.includes(cityName)){p.piety=clamp(p.piety+1);log('uskonnollinen keskus: hurskaus +1');}
  for(const [e,c] of visitEffects(cityName)){if(e.pay||e.requires_trade||e.deliver||e.deliver_any||e.choice||e.invest||e.give_at)continue;if(!cond(p,e.cond))continue;const k=c.id+'|'+p.i;if(e.once&&p.once[k])continue;if(e.first_only&&c.first)continue;p.once[k]=true;c.first=true;grant(p,e,c);}}
-function grant(p,e,c){if(e.money){p.money+=e.money;log(`${c.id}: +${e.money} t`);}if(e.piety){p.piety=clamp(p.piety+e.piety);log(`${c.id}: hurskaus ${e.piety>0?'+':''}${e.piety}`);}if(e.health){p.health=Math.max(0,Math.min(5,p.health+e.health));log(`${c.id}: terveys ${e.health>0?'+':''}${e.health}`);}if(e.strength){p.strength=clamp(p.strength+e.strength);log(`${c.id}: voima +${e.strength}`);}
+function grant(p,e,c){if(e.money){p.money+=e.money;log(`${c.id}: +${e.money} t`);}if(e.piety){p.piety=clamp(p.piety+e.piety);log(`${c.id}: hurskaus ${e.piety>0?'+':''}${e.piety}`);}if(e.health){setHealth(p,p.health+e.health);log(`${c.id}: terveys ${e.health>0?'+':''}${e.health}`);}if(e.strength){p.strength=clamp(p.strength+e.strength);log(`${c.id}: voima +${e.strength}`);}
  if(e.roll){const v=rollDie(6);const row=e.roll.table.find(r=>v>=r[0]&&v<=r[1]);log(`${c.id}: heittää ${v}`);if(row)for(const x of row[2])applyTo(p,{...x,who:'self'},c);}
  if(e.choice){const k=+prompt(`${c.title}\n${p.name}, valitse:\n`+e.choice.map((o,i)=>`${i+1}) ${o.label}`).join('\n'),'1')-1;const o=e.choice[k]||e.choice[0];for(const x of o.effects)applyTo(p,{...x,who:'self'},c);}
  if(e.discount){const v=rollDie(e.discount.die||6);p.disc={goods:e.discount.goods,cities:e.discount.cities,delta:-v};log(`${c.id}: alennus ${v} t seuraavaan ostoon`);}
@@ -214,6 +222,7 @@ function grant(p,e,c){if(e.money){p.money+=e.money;log(`${c.id}: +${e.money} t`)
 function tradeHook(cityName){const p=P();for(const [e,c] of effs('visit')){if(!e.requires_trade||!e.cities.includes(cityName))continue;const k=c.id+'|'+p.i;if(p.once[k])continue;p.once[k]=true;p.money+=e.money;log(`${c.id}: +${e.money} t`);}}
 function canDeliver(p,e){if(e.deliver)return Object.entries(e.deliver).every(([g,n])=>p.cargo.filter(x=>x===g).length>=n);if(e.deliver_any)return Object.keys(e.deliver_any).some(g=>p.cargo.includes(g));return true;}
 function cityCardButtons(cityName){const p=P();let h='';
+ if(CARDS.regions.USKONNOLLISET.includes(cityName)&&p.health<5)h+=`<button onclick="heal()" ${p.money>=1&&!G.healed?'':'disabled'}>Hoito 1 t: terveys +1${p.sick?' (parantaa sairauden)':''}</button> `;
  for(const [e,c] of visitEffects(cityName)){if(!(e.pay||e.deliver||e.deliver_any||e.choice||e.invest||e.give_at))continue;const k=c.id+'|'+p.i;if(p.once[k]||!cond(p,e.cond)||(e.first_only&&c.first))continue;const ok=(e.pay==null||p.money>=e.pay)&&canDeliver(p,e);
   h+=`<button onclick="doVisit('${c.id}','${cityName}')" ${ok?'':'disabled'}>${c.id}: ${e.label||(e.deliver?'Toimita '+Object.entries(e.deliver).map(([g,n])=>n+' '+g).join(', '):'Maksa '+e.pay+' t')}</button>`;}
  for(const [e,c] of effs('ship_offer')){if(e.city!==cityName||p.ship)continue;h+=`<button onclick="buyShip('${c.id}')" ${p.money>=e.price?'':'disabled'}>Osta laiva ${e.name} ${e.price} t (lasti ${e.cap})</button>`;}
@@ -251,11 +260,14 @@ function renderPrices(){if(!pricesOn||!G)return;const here=N[P().pos].name;
 // --- UI
 function render(){const p=P();drawTokens();renderPrices();renderCards();
  document.getElementById('status').innerHTML=`<b>Kierros ${G.round}/${G.rounds}</b> &nbsp; <b class="p${p.i}">${p.name}</b> @ ${N[p.pos].name||('pallura '+p.pos+(MIXED.has(p.pos)?' (rantapaikka)':''))}<br>
-  Raha <b>${p.money}</b> t &nbsp; Pankki (Turku) <b>${p.bank}</b> t &nbsp; Velka <b>${p.debt}</b> t &nbsp; Hurskaus <b>${p.piety}</b> &nbsp; Voima <b>${p.strength}</b> &nbsp; Terveys <b>${p.health}</b>${p.ship?' &nbsp; Laiva: '+p.ship:''}<br>Lasti (${p.cargo.length}/${p.cap}): ${p.cargo.join(', ')||'-'}<br>
+  Raha <b>${p.money}</b> t &nbsp; Pankki (Turku) <b>${p.bank}</b> t &nbsp; Velka <b>${p.debt}</b> t &nbsp; Hurskaus <b>${p.piety}</b> &nbsp; Voima <b>${p.strength}</b> &nbsp; Terveys <b>${p.health}</b>${p.sick?' <b style="color:#f66">SAIRAS</b>':''}${p.ship?' &nbsp; Laiva: '+p.ship:''}<br>Lasti (${p.cargo.length}/${p.cap}): ${p.cargo.join(', ')||'-'}<br>
   <small>${G.players.map(q=>`<span class="p${q.i}">P${q.i+1}</span> ${q.money}/${q.bank}t @${N[q.pos].name||q.pos}`).join(' &nbsp; ')}</small>`;
  const canSea=(p.veh==='meri'||MIXED.has(p.pos))&&(ADJ[p.pos]||[]).some(e=>e[1]==='meri'),canLand=(p.veh==='maa'||MIXED.has(p.pos))&&(ADJ[p.pos]||[]).some(e=>e[1]==='maa');
  let a='';
  if(G.phase==='end')a='<b>Peli päättynyt</b>';
+ else if(p.sick&&N[p.pos].kind!=='kaupunki'&&!G.moved)a=`<b>Sairas.</b> <button onclick="sickMove()">Kulje kohti lähintä kaupunkia</button>`;
+ else if(p.sick&&N[p.pos].kind==='kaupunki'&&!G.sickRolled&&!G.moved)a=`<b>Sairas ${N[p.pos].name}:ssa.</b> <button onclick="recoverRoll()">Heitä toipumisnoppa (5-6)</button>`;
+ else if(p.sick&&!G.moved)a=`<b>Sairas, lepää.</b>`;
  else if(!G.moved)a=`<button onclick="startMove('maa')" ${canLand?'':'disabled'}>Vankkurit (D8)</button> <button onclick="startMove('meri')" ${canSea?'':'disabled'}>Laiva (2D6)</button> <small>nyt: ${p.veh==='meri'?'laivassa':'maalla'}${MIXED.has(p.pos)?', rantapaikka (vaihto sallittu)':''}</small> <button onclick="stopHere()">Jää paikalleen</button>`;
  else if(G.phase==='move')a=`Liikepisteitä jäljellä <b>${G.mp}</b> (${G.mode}). Klikkaa mitä tahansa valkoreunaista palluraa, siirto kulkee lyhintä reittiä. <button onclick="stopHere()">Pysähdy tähän</button>`;
  if(G.phase!=='end'&&p.hand.length)a+=`<br>Käsi: `+p.hand.map(id=>`<button onclick="playHand('${id}')">${id} ${CARDBY[id].title}</button>`).join('');
