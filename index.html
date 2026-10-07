@@ -139,8 +139,8 @@ function clickNode(id){if(G.phase!=='move'||G.mp<=0)return;const {dist,prev}=rea
  if(N[id].kind==='kaupunki'){log(`saapuu: ${N[id].name}${N[id].name==='Åbo'?' (koti)':''} (${dist[id]} askelta)`);arriveHook(N[id].name);}else{log(`siirtyy ${dist[id]} askelta${N[id].name?' ('+N[id].name+')':''}`);if(N[id].name)arriveHook(N[id].name);}
  if(G.mp===0){G.phase='done';log('liikepisteet käytetty');}
  render();
- if(N[id].kind==='merisolmu'&&(G.mdeck.length||G.mdisc.length)&&G.mp===0)drawEvent('M');else if(G.mp===0)cityEventCheck();}
-function stopHere(){const wasMove=G.phase==='move'&&G.mp>0;G.phase='done';G.mp=0;log('pysähtyy '+(N[P().pos].name||'pallurassa '+P().pos));render();cityEventCheck();}
+ if(N[id].kind==='merisolmu'&&(G.mdeck.length||G.mdisc.length)&&G.mp===0&&!G.evDrawn){G.evDrawn=true;drawEvent('M');}else if(G.mp===0)cityEventCheck();}
+function stopHere(){const wasMove=G.phase==='move'&&G.mp>0;G.phase='done';G.mp=0;log('pysähtyy '+(N[P().pos].name||'pallurassa '+P().pos));render();if(wasMove&&N[P().pos].kind==='merisolmu'&&!G.evDrawn){G.evDrawn=true;drawEvent('M');}else cityEventCheck();}
 function endTurn(){const p=P();cityEventCheck();G.evDrawn=false;p.noTradeRound=0;p.bonus=null;G.trail=[];G.cur++;G.usedBuys={};G.moved=false;G.mode=null;G.phase='start';G.sickRolled=false;G.healed=false;
  if(G.cur>=G.players.length){G.cur=0;G.round++;refill();if(G.round>G.rounds){endGame();return;}log(`--- kierros ${G.round} ---`);drawCard();}
  render();}
