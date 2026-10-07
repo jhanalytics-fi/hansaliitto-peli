@@ -133,14 +133,13 @@ function startMove(mode){const p=P();if(G.moved)return;if(mode!==p.veh&&!MIXED.h
  log(`${mode==='meri'?'purjehtii':'kulkee maitse'}, noppa ${d1}${d2?'+'+d2:''}${mod?(mod>0?' +':' ')+mod+' (hahmo'+(extra.length?', '+extra.join(', '):'')+')':''} = ${G.mp}${baltic?' (Itämeren myrskyt: d6)':''}`);render();}
 function clickNode(id){if(G.phase!=='move'||G.mp<=0)return;const {dist,prev}=reachMap();if(!(id in dist))return;const p=P();
  let path=[];for(let n=id;n!==p.pos;n=prev[n])path.unshift(n);
- const evi=G.mdeck.length?path.findIndex(n=>N[n].kind==='merisolmu'):-1;if(evi>=0&&evi<path.length-1){path=path.slice(0,evi+1);id=path[path.length-1];log('meritapahtumaruutu pysäyttää matkan');}
  const via=path.slice(0,-1).filter(n=>N[n].kind==='kaupunki').map(n=>N[n].name);
  p.pos=id;G.mp-=dist[id];G.usedBuys={};G.trail=(G.trail||[]).concat(path);
  if(via.length)log(`kulkee ohi: ${via.join(', ')}`);
  if(N[id].kind==='kaupunki'){log(`saapuu: ${N[id].name}${N[id].name==='Åbo'?' (koti)':''} (${dist[id]} askelta)`);arriveHook(N[id].name);}else{log(`siirtyy ${dist[id]} askelta${N[id].name?' ('+N[id].name+')':''}`);if(N[id].name)arriveHook(N[id].name);}
  if(G.mp===0){G.phase='done';log('liikepisteet käytetty');}
  render();
- if(N[id].kind==='merisolmu'&&G.mdeck.length)drawEvent('M');else if(G.mp===0)cityEventCheck();}
+ if(N[id].kind==='merisolmu'&&(G.mdeck.length||G.mdisc.length)&&G.mp===0)drawEvent('M');else if(G.mp===0)cityEventCheck();}
 function stopHere(){const wasMove=G.phase==='move'&&G.mp>0;G.phase='done';G.mp=0;log('pysähtyy '+(N[P().pos].name||'pallurassa '+P().pos));render();cityEventCheck();}
 function endTurn(){const p=P();cityEventCheck();G.evDrawn=false;p.noTradeRound=0;p.bonus=null;G.trail=[];G.cur++;G.usedBuys={};G.moved=false;G.mode=null;G.phase='start';G.sickRolled=false;G.healed=false;
  if(G.cur>=G.players.length){G.cur=0;G.round++;refill();if(G.round>G.rounds){endGame();return;}log(`--- kierros ${G.round} ---`);drawCard();}
